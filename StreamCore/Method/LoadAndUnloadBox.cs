@@ -5,206 +5,149 @@ namespace StreamCore.Method
     //计算装卸费方法
     public class LoadAndUnloadBox
     {
-        // 实际海运箱体积（单位：立方米）
-        private const double Capacity40 = 12.05 * 2.35 * 2.68; // ≈ 75.89 m³
-        private const double Capacity20 = 5.69 * 2.13 * 2.18;  // ≈ 26.42 m³
+        // 箱体体积（单位：m³）
+        private const double Capacity40 = 12.05 * 2.35 * 2.68 * 1000000.0; // ≈ 75.89 m³
+        private const double Capacity20 = 5.69 * 2.13 * 2.18 * 1000000.0;  // ≈ 26.42 m³
+        private const double CapacityLoose = 1.0 * 1000000.0;              // 散板 1 m³
+
         // 装载率
         private const double RateFirst = 0.80;
         private const double RateSecond = 0.85;
+
         // 费用单价（HKD）
-        private const decimal Price40 = 1100;
-        private const decimal Price20 = 890;
-        private const decimal PriceLoose = 40; // 散板按每板计费
-        // 计算单日装卸费用
-        public static (int count40, int count20, int countLoose, decimal fee40, decimal fee20, decimal feeLoose, decimal totalFee) CalculateDaily(IEnumerable<double> volumes)
+        private const decimal Price40 = 1100m;
+        private const decimal Price20 = 890m;
+        private const decimal PriceLoose = 40m;
+
+        public static (int count40, int count20, int countLoose,decimal fee40, decimal fee20, decimal feeLoose,decimal totalFee) CalculateDaily(IEnumerable<double> volumes)
         {
             var volumeList = volumes.Where(v => v > 0).OrderByDescending(v => v).ToList();
             if (!volumeList.Any())
                 return (0, 0, 0, 0, 0, 0, 0);
 
             var queue = new Queue<double>(volumeList);
-            var fortyContainers = new List<double>();
+            var fortyContainers = new List<List<double>>(); // 每个40柜商品明细
 
-            // ---------- 第一轮：按80%装载率装40柜 ----------
+            // ---------- 第一轮：40柜按80%装载 ----------
             while (queue.Count > 0)
             {
-                double currentUsed = 0;
-                while (queue.Count > 0 && currentUsed < Capacity40 * RateFirst)
+                var container = new List<double>();
+                double used = 0;
+                while (queue.Count > 0 && used < Capacity40 * RateFirst)
                 {
                     var item = queue.Peek();
-                    if (currentUsed + item <= Capacity40 * RateFirst)
-                    {
-                        currentUsed += item;
-                        queue.Dequeue();
-                    }
-                    else
-                    {
-                        break;
-                    }
+                    // 不存在放不下，直接放入
+                    used += item;
+                    container.Add(item);
+                    queue.Dequeue();
                 }
-                if (currentUsed > 0)
-                    fortyContainers.Add(currentUsed);
+                if (container.Any())
+                    fortyContainers.Add(container);
             }
 
-            // ---------- 第二轮：调整40柜至85%装载率 ----------
-            if (fortyContainers.Count > 0)
+            // ---------- 第二轮：反复拆最后一个柜，向前填充至85% ----------
+            List<double> finalRemaining = new List<double>();
+            while (fortyContainers.Count > 1)
             {
-                //for (int i=fortyContainers.Count-1;i>0;i--)
-                //{
-                //    if (fortyContainers[i] < 0)
-                //        continue;
-                //    var item = fortyContainers[i];
-                //    for (int j = 0; j < fortyContainers.Count - 1; j++)
-                //    {
-                //        double needVolume = Capacity40 * RateSecond - fortyContainers[j];
-                //        item = item - needVolume;
-                //        if (item <= 0)
-                //            break;
-                //    }
-                //}
+                int lastIdx = fortyContainers.Count - 1;
+                var sourceItems = new List<double>(fortyContainers[lastIdx]);
+                fortyContainers.RemoveAt(lastIdx);
 
+                if (!sourceItems.Any())
+                    continue;
 
-
-
-
-
-                for (int i = fortyContainers.Count - 1; i >= 0; i--)
+                bool anyFilled = false;
+                // 尝试填充到前面的柜子（按顺序）
+                for (int dest = 0; dest < fortyContainers.Count && sourceItems.Any(); dest++)
                 {
-                    if (fortyContainers[i] < 0)
+                    var target = fortyContainers[dest];
+                    double used = target.Sum();
+                    double targetLimit = Capacity40 * RateSecond;
+
+                    if (used >= targetLimit)
                         continue;
 
-                    double needed = Capacity40 * RateSecond - fortyContainers[i];
-
-                    for (int j = i + 1; j < fortyContainers.Count; j++)
+                    int idx = 0;
+                    while (idx < sourceItems.Count)
                     {
-                        if (needed <= 0) break;
-                        double available = fortyContainers[j] - Capacity40 * RateSecond;
-                        if (available > 0)
+                        var item = sourceItems[idx];
+                        if (used + item <= targetLimit)
                         {
-                            double taken = Math.Min(available, needed);
-                            fortyContainers[j] -= taken;
-                            fortyContainers[i] += taken;
-                            needed -= taken;
-                        }
-                    }
-
-                    if (needed > 0 && queue.Count > 0)
-                    {
-                        while (queue.Count > 0 && needed > 0)
-                        {
-                            var item = queue.Peek();
-                            if (item <= needed)
-                            {
-                                needed -= item;
-                                fortyContainers[i] += item;
-                                queue.Dequeue();
-                            }
-                            else
-                            {
-                                fortyContainers[i] += item;
-                                queue.Dequeue();
-                                needed = 0;
-                            }
-                        }
-                    }
-                }
-                fortyContainers = fortyContainers.Where(v => v > 0).ToList();
-            }
-
-            // ---------- 剩余商品处理 ----------
-            int extra40 = 0, count20 = 0, countLoose = 0;
-            decimal feeExtra40 = 0, fee20 = 0, feeLoose = 0;
-            var remaining = queue.ToList();
-
-            if (remaining.Any())
-            {
-                var normalItems = new List<double>();
-                var oversizeItems = new List<double>();
-                double twentyLimit = Capacity20 * RateSecond;
-
-                foreach (var vol in remaining)
-                {
-                    if (vol > twentyLimit)
-                        oversizeItems.Add(vol);
-                    else
-                        normalItems.Add(vol);
-                }
-
-                // 处理超大件：使用40柜
-                if (oversizeItems.Any())
-                {
-                    var oversizeQueue = new Queue<double>(oversizeItems.OrderByDescending(v => v));
-                    while (oversizeQueue.Count > 0)
-                    {
-                        double used = 0;
-                        while (oversizeQueue.Count > 0 && used < Capacity40 * RateSecond)
-                        {
-                            var item = oversizeQueue.Peek();
-                            if (used + item <= Capacity40 * RateSecond)
-                            {
-                                used += item;
-                                oversizeQueue.Dequeue();
-                            }
-                            else
-                            {
-                                used += item;
-                                oversizeQueue.Dequeue();
-                                break;
-                            }
-                        }
-                        if (used > 0)
-                        {
-                            extra40++;
-                            feeExtra40 += Price40;
-                        }
-                    }
-                }
-
-                // 处理普通件：比较20柜和散板
-                if (normalItems.Any())
-                {
-                    double twentyUsed = 0;
-                    int tempCount20 = 0;
-                    decimal tempFee20 = 0;
-                    var sortedNormal = normalItems.OrderByDescending(v => v).ToList();
-                    foreach (var vol in sortedNormal)
-                    {
-                        if (twentyUsed + vol <= twentyLimit)
-                        {
-                            twentyUsed += vol;
+                            used += item;
+                            target.Add(item);
+                            sourceItems.RemoveAt(idx);
+                            anyFilled = true;
                         }
                         else
                         {
-                            if (twentyUsed > 0)
-                            {
-                                tempCount20++;
-                                tempFee20 += Price20;
-                            }
-                            twentyUsed = vol;
+                            break; // 放不下，换下一个目标柜
                         }
                     }
-                    if (twentyUsed > 0)
-                    {
-                        tempCount20++;
-                        tempFee20 += Price20;
-                    }
+                }
 
-                    int normalCount = normalItems.Count;
-                    decimal looseFeeForNormal = normalCount * PriceLoose;
+                // 如果源商品全部用完，继续拆下一个柜子
+                if (!sourceItems.Any())
+                    continue;
 
-                    if (tempFee20 <= looseFeeForNormal)
+                // 如果源商品有剩余，则停止循环，剩余即为最终剩余
+                finalRemaining.AddRange(sourceItems);
+                break;
+            }
+
+            // ---------- 合并所有剩余商品 ----------
+            var allRemaining = finalRemaining.Concat(queue).OrderByDescending(v => v).ToList();
+
+            int extra40 = 0, count20 = 0, countLoose = 0;
+            decimal feeExtra40 = 0, fee20 = 0, feeLoose = 0;
+
+            if (allRemaining.Any())
+            {
+                double totalVol = allRemaining.Sum();
+                double twentyLimit = Capacity20 * RateSecond;
+                bool hasOversize = allRemaining.Any(v => v > twentyLimit);
+
+                // 散板方案（按体积折算板数）
+                double looseCapacity = CapacityLoose * RateSecond; // 0.85 m³/板
+                int looseCount = (int)Math.Ceiling(totalVol / looseCapacity);
+                decimal looseFee = looseCount * PriceLoose;
+
+                // 判断是否可用20柜：无超大件
+                if (!hasOversize)
+                {
+                    int cnt20 = (int)Math.Ceiling(totalVol / twentyLimit);
+                    decimal cost20 = cnt20 * Price20;
+
+                    if (cost20 <= looseFee)
                     {
-                        count20 = tempCount20;
-                        fee20 = tempFee20;
+                        count20 = cnt20;
+                        fee20 = cost20;
                     }
                     else
                     {
-                        countLoose = normalCount;
-                        feeLoose = looseFeeForNormal;
+                        countLoose = looseCount;
+                        feeLoose = looseFee;
+                    }
+                }
+                else
+                {
+                    // 有超大件，只能比较40柜和散板
+                    int cnt40 = (int)Math.Ceiling(totalVol / (Capacity40 * RateSecond));
+                    decimal cost40 = cnt40 * Price40;
+
+                    if (cost40 <= looseFee)
+                    {
+                        extra40 = cnt40;
+                        feeExtra40 = cost40;
+                    }
+                    else
+                    {
+                        countLoose = looseCount;
+                        feeLoose = looseFee;
                     }
                 }
             }
 
+            // 最终统计
             int count40 = fortyContainers.Count + extra40;
             decimal fee40 = count40 * Price40;
             decimal totalFee = fee40 + fee20 + feeLoose;

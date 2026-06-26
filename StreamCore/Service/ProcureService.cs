@@ -226,7 +226,7 @@ namespace StreamCore.Service
             };
             return cost;
         }
-        //计算PO装箱费
+        # region 计算PO装箱费
         public async Task<LoadUnloadResult> PoUploadunload(DateTime startTime, DateTime endTime)
         {
             // 查询PO订单：按日期分组，获取每个商品的单个体积（m³）和数量
@@ -236,7 +236,7 @@ namespace StreamCore.Service
                 {
                     Date = p.Instore_time.Value.Date,
                     Number = SqlFunc.ToDouble(SqlFunc.IsNull(p.Number, "0")),          // 数量（double）
-                    VolumePerUnit = SqlFunc.ToDouble(SqlFunc.IsNull(g.Volume, "0")) / 1000000.0 // 单个体积（m³）
+                    VolumePerUnit = SqlFunc.ToDouble(SqlFunc.IsNull(g.Volume, "0")) // 单个体积（cm³）
                 }).MergeTable().ToListAsync();
 
             if (!items.Any())
@@ -280,7 +280,9 @@ namespace StreamCore.Service
                 TotalFee = totalFee
             };
         }
-        // 计算 SO 出库装箱费（按出库日期分组）
+        #endregion
+
+        #region 计算 SO 出库装箱费（按出库日期分组）
         public async Task<LoadUnloadResult> SoUploadunload(DateTime startTime, DateTime endTime)
         {
             // 查询 SO 订单：按出库日期分组，获取每个商品的单个体积（m³）和数量
@@ -290,7 +292,7 @@ namespace StreamCore.Service
                 {
                     Date = s.Outstore_time.Value.Date,
                     Number = SqlFunc.ToDouble(SqlFunc.IsNull(s.Number, "0")),          // 数量（double）
-                    VolumePerUnit = SqlFunc.ToDouble(SqlFunc.IsNull(g.Volume, "0")) / 1000000.0 // 单个体积（m³）
+                    VolumePerUnit = SqlFunc.ToDouble(SqlFunc.IsNull(g.Volume, "0")) // 单个体积（cm³）
                 })
                 .MergeTable()
                 .ToListAsync();
@@ -337,6 +339,37 @@ namespace StreamCore.Service
                 FeeLoose = totalFeeLoose,
                 TotalFee = totalFee
             };
+        }
+        #endregion
+        //计算高价值打板费
+        public async Task<HighCardResult> Highpallet(DateTime startTime, DateTime endTime)
+        {
+            //查询PO单，根据订单进行分类，选取订单中的单价大于1500的商品总体积
+            var allVolumes = await _db.Queryable<Procure,Goods>((p,g)=>p.Barcode==g.Barcode)
+                             .Where((p,g)=>p.Instore_time>=startTime && p.Instore_time<=endTime && p.Price>1500)
+                             .GroupBy((p,g)=>p.Procure_no)
+                             .Select((p, g) => new {
+                                 No = p.Procure_no,
+                                 totalVolume = SqlFunc.AggregateSum(SqlFunc.ToDecimal(SqlFunc.IsNull(p.Number, "0")) *
+                                 (SqlFunc.ToDecimal(SqlFunc.IsNull(g.Volume, "0")) / 1000000m))
+                             }).MergeTable().OrderBy(x => x.No).ToListAsync();
+            if (!allVolumes.Any())
+                return new HighCardResult();
+            int highPallet = 0;
+            decimal highFee = 0;
+            foreach (var highVolume in allVolumes)
+            {
+                int number = (int)Math.Floor(highVolume.totalVolume);
+                highPallet += number;
+                decimal fee = number * 100;
+                highFee += fee;
+            }
+            return new HighCardResult
+            {
+                Number = highPallet,
+                All_cost = highFee
+            };
+
         }
     }
 }

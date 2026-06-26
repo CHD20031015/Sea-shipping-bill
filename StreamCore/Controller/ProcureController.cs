@@ -9,18 +9,18 @@ namespace StreamCore.Controller
     public class ProcureController : ControllerBase
     {
         private ProcureService _procureService;
-        public ProcureController(ProcureService procureService) 
+        public ProcureController(ProcureService procureService)
         {
             _procureService = procureService;
         }
         [HttpGet]
         [Route("api/shipping/procure")]
-        public async Task<IActionResult> Getprocure(DateTime?startTime,DateTime?endTime,int page,int pageSize)
+        public async Task<IActionResult> Getprocure(DateTime? startTime, DateTime? endTime, int page, int pageSize)
         {
             try
             {
                 // 使用分页查询
-                var procure = await _procureService.getallProcure(startTime,endTime,page, pageSize);
+                var procure = await _procureService.getallProcure(startTime, endTime, page, pageSize);
                 return Ok(procure);
             }
             catch (Exception ex)
@@ -32,12 +32,12 @@ namespace StreamCore.Controller
         }
         [HttpGet]
         [Route("api/shipping/sale")]
-        public async Task<IActionResult> GetSale(DateTime? startTime, DateTime? endTime,int page, int pageSize)
+        public async Task<IActionResult> GetSale(DateTime? startTime, DateTime? endTime, int page, int pageSize)
         {
             try
             {
                 // 使用分页查询
-                var sale = await _procureService.getallSale(startTime, endTime,page, pageSize);
+                var sale = await _procureService.getallSale(startTime, endTime, page, pageSize);
                 return Ok(sale);
             }
             catch (Exception ex)
@@ -52,7 +52,7 @@ namespace StreamCore.Controller
         [Route("api/shipping/Warehouserent")]
         public async Task<IActionResult> Warehouserent(DateTime startTime, DateTime endTime)
         {
-            try 
+            try
             {
                 // 参数验证
                 if (startTime == default || endTime == default)
@@ -110,6 +110,29 @@ namespace StreamCore.Controller
                     return BadRequest(new { message = "开始日期不能晚于结束日期" });
                 // 调用服务层
                 var result = await _procureService.SoUploadunload(startTime, endTime);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                // 记录日志
+                Console.WriteLine($"仓租费计算异常: {ex}");
+                return StatusCode(500, new { message = "计算失败", detail = ex.Message });
+            }
+        }
+
+        [HttpGet]
+        [Route("api/shipping/Highpallet")]
+        public async Task<IActionResult> Highpallet(DateTime startTime, DateTime endTime)
+        {
+            try
+            {
+                // 参数验证
+                if (startTime == default || endTime == default)
+                    return BadRequest(new { message = "日期参数无效" });
+                if (startTime > endTime)
+                    return BadRequest(new { message = "开始日期不能晚于结束日期" });
+                //调用服务层
+                var result = await _procureService.Highpallet(startTime, endTime);
                 return Ok(result);
             }
             catch (Exception ex)
