@@ -18,6 +18,7 @@ builder.Services.AddScoped<ShippingService>();
 builder.Services.AddScoped<ProcureService>();
 builder.Services.AddScoped<UploadService>();
 builder.Services.AddScoped<LoadAndUnloadBox>();
+builder.Services.AddScoped<SystemService>();
 // 注册过滤器
 builder.Services.AddScoped<AuthonizationFilter>();
 //添加MVC服务

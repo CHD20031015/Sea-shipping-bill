@@ -1,6 +1,6 @@
 ﻿using SqlSugar;
 
-namespace StreamCore.Model
+namespace StreamCore.StreamModel
 {
     [SugarTable("goods")]
     public class Goods

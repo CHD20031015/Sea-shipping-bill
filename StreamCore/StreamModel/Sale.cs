@@ -1,6 +1,6 @@
 ﻿using SqlSugar;
 
-namespace StreamCore.Model
+namespace StreamCore.StreamModel
 {
     [SugarTable("sale")]
     public class Sale
@@ -131,7 +131,7 @@ namespace StreamCore.Model
         /// 默认值:
         ///</summary>
         [SugarColumn(ColumnName = "deliver_time")]
-        public string? Deliver_time { get; set; }
+        public DateTime? Deliver_time { get; set; }
 
         /// <summary>
         /// 备  注:出库单号
