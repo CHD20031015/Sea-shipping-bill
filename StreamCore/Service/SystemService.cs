@@ -285,11 +285,11 @@ namespace StreamCore.Service
             var query = _db.Queryable<Sale, Procure>((s, p) => s.Procure_no == p.Procure_no);
 
             if (startDate.HasValue)
-                query = query.Where((s, p) => s.Deliver_time >= startDate.Value);
+                query = query.Where((s, p) => SqlFunc.ToDate(s.Deliver_time) >= startDate.Value);
             if (endDate.HasValue)
             {
                 var end = endDate.Value.AddDays(1);
-                query = query.Where((s, p) => s.Deliver_time < end);
+                query = query.Where((s, p) => SqlFunc.ToDate(s.Deliver_time) < end);
             }
 
             var solist = await query

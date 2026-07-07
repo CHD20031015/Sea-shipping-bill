@@ -151,7 +151,7 @@ namespace StreamCore.Service
                             Outstore_notice = GetCellString(worksheet, row, 14),      // 出库通知单
                             Transport_type = GetCellString(worksheet, row, 15),       // 运输方式
                             Outstore_notice_time = GetCellString(worksheet, row, 16), // 出库通知单创建时间（文本）
-                            Deliver_time = GetCellDateTime(worksheet, row, 17),         // 发货时间（文本）
+                            Deliver_time = GetCellString(worksheet, row, 17),         // 发货时间（文本）
                             Outstore_number = GetCellString(worksheet, row, 18),      // 出库单号
                             Outstore_time = GetCellDateTime(worksheet, row, 19),      // 出库时间
                             Number = GetCellString(worksheet, row, 20),               // 出库数量（文本）

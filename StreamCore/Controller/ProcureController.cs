@@ -30,6 +30,7 @@ namespace StreamCore.Controller
                 return StatusCode(500, new { error = ex.Message, detail = ex.StackTrace });
             }
         }
+        
         [HttpGet]
         [Route("api/shipping/sale")]
         public async Task<IActionResult> GetSale(DateTime? startTime, DateTime? endTime, int page, int pageSize)

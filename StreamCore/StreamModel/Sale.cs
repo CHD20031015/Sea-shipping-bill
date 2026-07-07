@@ -131,7 +131,7 @@ namespace StreamCore.StreamModel
         /// 默认值:
         ///</summary>
         [SugarColumn(ColumnName = "deliver_time")]
-        public DateTime? Deliver_time { get; set; }
+        public string? Deliver_time { get; set; }
 
         /// <summary>
         /// 备  注:出库单号

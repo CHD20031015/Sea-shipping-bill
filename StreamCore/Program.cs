@@ -19,13 +19,14 @@ builder.Services.AddScoped<ProcureService>();
 builder.Services.AddScoped<UploadService>();
 builder.Services.AddScoped<LoadAndUnloadBox>();
 builder.Services.AddScoped<SystemService>();
+builder.Services.AddScoped<LoadingcontainerService>();
 // 注册过滤器
 builder.Services.AddScoped<AuthonizationFilter>();
 //添加MVC服务
 builder.Services.AddControllersWithViews(options =>
 {
     // 注册全局过滤器
-    options.Filters.Add<AuthonizationFilter>();
+    // options.Filters.Add<AuthonizationFilter>();
 });
 
 // 3. 添加 Swagger 服务（必须）
