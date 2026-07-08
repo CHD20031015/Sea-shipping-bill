@@ -277,7 +277,7 @@ namespace StreamCore.Service
                 // 装入当前纸箱 大件优先
                 var boxItems = new List<SaleItemDto>();
                 double used = 0;
-                for (int i = remaining.Count - 1; i >= 0; i--)
+                for (int i=0; i < remaining.Count; i++)
                 {
                     var item = remaining[i];
                     if (used + item.Volume <= selectedCapacity)
@@ -334,13 +334,14 @@ namespace StreamCore.Service
                 var relatedBoxes = paperBoxes.Where(b => boxNos.Contains(b.Paper_box_no)).ToList();
                 var DeliverTime = relatedBoxes.Min(b => b.Deliver_time) ?? DateTime.Now;
                 double usedVolume = containerItems.Sum(i => i.Volume);
+                double realityVolume = relatedBoxes.Sum(b => (double)b.Reality_volume);
                 double totalVolume = transportBox_40; // 40柜总容积
                 var container = new Transportbox
                 {
                     Type = 4,
                     Deliver_time = batchDeliverTime ?? DateTime.Now.Date,   // 统一使用批次时间
                     All_volume = (decimal)totalVolume,
-                    Reality_volume = (decimal)usedVolume,
+                    Reality_volume = (decimal)realityVolume,
                     Country_name = country,
                     Create_time = DateTime.Now,
                     Transport_box_no = $"TB-40-{DateTime.Now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N").Substring(0, 6)}",
@@ -367,13 +368,14 @@ namespace StreamCore.Service
                 var relatedBoxes = paperBoxes.Where(b => boxNos.Contains(b.Paper_box_no)).ToList();
                 var DeliverTime = relatedBoxes.Min(b => b.Deliver_time) ?? DateTime.Now;
                 double usedVolume = containerItems.Sum(i => i.Volume);
+                double realityVolume = relatedBoxes.Sum(b => (double)b.Reality_volume);
                 double totalVolume = transportBox_20; // 20柜总容积
                 var container = new Transportbox
                 {
                     Type = 2,
                     Deliver_time = batchDeliverTime ?? DateTime.Now.Date,   // 统一使用批次时间
                     All_volume = (decimal)totalVolume,
-                    Reality_volume = (decimal)usedVolume,
+                    Reality_volume = (decimal)realityVolume,
                     Country_name = country,
                     Create_time = DateTime.Now,
                     Transport_box_no = $"TB-20-{DateTime.Now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N").Substring(0, 6)}",
@@ -600,13 +602,13 @@ namespace StreamCore.Service
             var cartons = paperBoxes.Where(p => p.Is_box == 0);
             foreach (var pb in cartons)
             {
-                double volume = pb.Type switch
-                {
-                    1 => paper_box_1,
-                    3 => paper_box_3,
-                    5 => paper_box_5,
-                    _ => 0 // 或其他默认值
-                };
+                //double volume = pb.Type switch
+                //{
+                //    1 => paper_box_1,
+                //    3 => paper_box_3,
+                //    5 => paper_box_5,
+                //    _ => 0 // 或其他默认值
+                //};
                 string boxTypeName = pb.Type switch
                 {
                     1 => "1号纸箱",
@@ -621,7 +623,7 @@ namespace StreamCore.Service
                     CountryName = pb.Country_name,
                     GoodsName = goodsDisplay,
                     Quantity = 1,
-                    Volume = SqlFunc.ToDecimal(volume),
+                    Volume = SqlFunc.ToDecimal(pb.Reality_volume),
                     CustomerName = pb.Customer_name,
                     is_box = 1  
                 });

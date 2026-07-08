@@ -20,6 +20,7 @@ builder.Services.AddScoped<UploadService>();
 builder.Services.AddScoped<LoadAndUnloadBox>();
 builder.Services.AddScoped<SystemService>();
 builder.Services.AddScoped<LoadingcontainerService>();
+builder.Services.AddScoped<WordtopdfService>();
 // 注册过滤器
 builder.Services.AddScoped<AuthonizationFilter>();
 //添加MVC服务
