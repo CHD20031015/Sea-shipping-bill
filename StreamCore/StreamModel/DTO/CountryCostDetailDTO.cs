@@ -16,5 +16,7 @@
         public decimal? Trailer { get; set; }           // 拖车费
         public decimal? Clearance { get; set; }         // 报关费
         public decimal? TotalCost { get; set; }         // 合计
+
+       
     }
 }

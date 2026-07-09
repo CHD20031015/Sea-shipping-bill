@@ -277,7 +277,7 @@ namespace StreamCore.Service
                 // 装入当前纸箱 大件优先
                 var boxItems = new List<SaleItemDto>();
                 double used = 0;
-                for (int i = remaining.Count - 1; i >= 0; i--)
+                for (int i=0; i < remaining.Count; i++)
                 {
                     var item = remaining[i];
                     if (used + item.Volume <= selectedCapacity)
@@ -285,6 +285,7 @@ namespace StreamCore.Service
                         used += item.Volume;
                         boxItems.Add(item);
                         remaining.RemoveAt(i);
+                        i--; // 调整索引，因为移除了当前项
                     }
                     else
                         continue; // 如果当前商品放不下，跳过该商品，装更小的商品
@@ -334,13 +335,14 @@ namespace StreamCore.Service
                 var relatedBoxes = paperBoxes.Where(b => boxNos.Contains(b.Paper_box_no)).ToList();
                 var DeliverTime = relatedBoxes.Min(b => b.Deliver_time) ?? DateTime.Now;
                 double usedVolume = containerItems.Sum(i => i.Volume);
+                double realityVolume = relatedBoxes.Sum(b => (double)b.Reality_volume);
                 double totalVolume = transportBox_40; // 40柜总容积
                 var container = new Transportbox
                 {
                     Type = 4,
                     Deliver_time = batchDeliverTime ?? DateTime.Now.Date,   // 统一使用批次时间
                     All_volume = (decimal)totalVolume,
-                    Reality_volume = (decimal)usedVolume,
+                    Reality_volume = (decimal)realityVolume,
                     Country_name = country,
                     Create_time = DateTime.Now,
                     Transport_box_no = $"TB-40-{DateTime.Now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N").Substring(0, 6)}",
@@ -367,13 +369,14 @@ namespace StreamCore.Service
                 var relatedBoxes = paperBoxes.Where(b => boxNos.Contains(b.Paper_box_no)).ToList();
                 var DeliverTime = relatedBoxes.Min(b => b.Deliver_time) ?? DateTime.Now;
                 double usedVolume = containerItems.Sum(i => i.Volume);
+                double realityVolume = relatedBoxes.Sum(b => (double)b.Reality_volume);
                 double totalVolume = transportBox_20; // 20柜总容积
                 var container = new Transportbox
                 {
                     Type = 2,
                     Deliver_time = batchDeliverTime ?? DateTime.Now.Date,   // 统一使用批次时间
                     All_volume = (decimal)totalVolume,
-                    Reality_volume = (decimal)usedVolume,
+                    Reality_volume = (decimal)realityVolume,
                     Country_name = country,
                     Create_time = DateTime.Now,
                     Transport_box_no = $"TB-20-{DateTime.Now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N").Substring(0, 6)}",
@@ -390,7 +393,7 @@ namespace StreamCore.Service
                     box.Transport_box_no = container.Transport_box_no;
                 }
                 //计算费用
-                var record = await CalculateFees(price40, usedVolume, totalVolume, container.Transport_box_no, supplierId, batchDeliverTime);
+                var record = await CalculateFees(price20, usedVolume, totalVolume, container.Transport_box_no, supplierId, batchDeliverTime);
                 records.Add(record);
             }
             return (containers, records);
@@ -407,7 +410,7 @@ namespace StreamCore.Service
             decimal? reviceGoods = oceanCost * 0.02m;
             decimal? trailer = oceanCost * 0.02m;
             decimal? clearance = oceanCost * 0.01m;
-            decimal? allCost = oceanCost + isf + insurance + portSurcharge + deliveryGoods + reviceGoods + trailer + clearance;
+            decimal? allCost = boxPrice + oceanCost + isf + insurance + portSurcharge + deliveryGoods + reviceGoods + trailer + clearance;
             double volumeRadio = volumeUsed / totalVolume;
             decimal ratio;
             if (volumeRadio < 0.2)
@@ -454,7 +457,6 @@ namespace StreamCore.Service
                 .ToListAsync(); // List<int>，因为 Id 非空
 
             // 3. 查询这些港口的所有供应商报价
-            //    使用 Where 过滤 Port_id 非空且包含在列表中
             var supplierPrices = await _db.Queryable<Supplier_port>()
                 .Where(sp => sp.Port_id != null && portIds.Contains(sp.Port_id.Value))
                 .Select(sp => new {sp.Port_id, sp.Supplier_id, sp.Price_20, sp.Price_40 })
@@ -469,6 +471,34 @@ namespace StreamCore.Service
         }
         #endregion
 
+        //获取全部供应商明细
+        public async Task<List<SupplierPriceDto>> GetAllSupplierPricesByCountry(string countryName)
+        {
+            // 1. 查询国家ID
+            var country = await _db.Queryable<Country>()
+                 .FirstAsync(c => c.Country_name == countryName);
+
+            // 2. 查询该国家下所有港口ID（非空 int 列表）
+            var portIds = await _db.Queryable<Port>()
+                .Where(p => p.Country_id == country.Id)
+                .Select(p => p.Id)
+                .ToListAsync(); 
+
+            if (!portIds.Any()) return new List<SupplierPriceDto>();
+
+            // 3. 查询这些港口的所有供应商报价，并关联供应商和港口名称
+            var supplierPrices = await _db.Queryable<Supplier_port>()
+                .Where(sp => sp.Port_id != null && portIds.Contains(sp.Port_id.Value))
+                .InnerJoin<StreamModel.Supplier>((sp, s) => sp.Supplier_id == s.Id)
+                .InnerJoin<Port>((sp, s, p) => sp.Port_id == p.Id)
+                .Select((sp, s, p) => new SupplierPriceDto{
+                        SupplierName = s.Supplier_name,
+                        PortName = p.Port_name,
+                        Price20 = sp.Price_20 ?? 0,
+                        Price40 = sp.Price_40 ?? 0
+                }).ToListAsync();
+            return supplierPrices;
+        }
 
         //装柜列表 第二步骤用
         public async Task<object> GetTransport(DateTime? startTime, DateTime? endTime)
@@ -524,7 +554,7 @@ namespace StreamCore.Service
                 decimal reviceGoods = oceanCost * 0.02m;     // 收货+装柜 2%
                 decimal trailer = oceanCost * 0.02m;         // 拖车 2%
                 decimal clearance = oceanCost * 0.01m;       // 报关 1%
-                // 合计费用 = 各项费用之和
+                                                             // 合计费用 = 各项费用之和
                 decimal totalCost = totalBoxPrice + oceanCost + isf + insurance + portSurcharge + deliveryGoods + reviceGoods + trailer + clearance;
 
                 result.Add(new CountryCostDetailDto
@@ -547,10 +577,8 @@ namespace StreamCore.Service
             }
             return result;
         }
-
-
-
-
+        
+        
         //获取海运装柜列表
         public async Task<List<ContainerListDTO>> GetContainerList(DateTime? startTime, DateTime? endTime, int? supplierId, string?countryName)
         {
@@ -600,13 +628,13 @@ namespace StreamCore.Service
             var cartons = paperBoxes.Where(p => p.Is_box == 0);
             foreach (var pb in cartons)
             {
-                double volume = pb.Type switch
-                {
-                    1 => paper_box_1,
-                    3 => paper_box_3,
-                    5 => paper_box_5,
-                    _ => 0 // 或其他默认值
-                };
+                //double volume = pb.Type switch
+                //{
+                //    1 => paper_box_1,
+                //    3 => paper_box_3,
+                //    5 => paper_box_5,
+                //    _ => 0 // 或其他默认值
+                //};
                 string boxTypeName = pb.Type switch
                 {
                     1 => "1号纸箱",
@@ -621,7 +649,7 @@ namespace StreamCore.Service
                     CountryName = pb.Country_name,
                     GoodsName = goodsDisplay,
                     Quantity = 1,
-                    Volume = SqlFunc.ToDecimal(volume),
+                    Volume = SqlFunc.ToDecimal(pb.Reality_volume),
                     CustomerName = pb.Customer_name,
                     is_box = 1  
                 });

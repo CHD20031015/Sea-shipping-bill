@@ -72,6 +72,24 @@ namespace StreamCore.Controller
 
 
         [HttpGet]
+        [Route("/api/shipping/GetAllSupplierPrices")]
+        public async Task<IActionResult> GetAllSupplierPrices([FromQuery] string countryName)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(countryName))
+                    return BadRequest(new { error = "国家名称不能为空" });
+
+                var list = await _loadingcontainerService.GetAllSupplierPricesByCountry(countryName);
+                return Ok(list);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        [HttpGet]
         [Route("/api/shipping/GetContainerList")]
         public async Task<IActionResult> GetContainerList(DateTime? startTime, DateTime? endTime, int? supplierId, string?countryName)
         {
