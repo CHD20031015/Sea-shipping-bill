@@ -18,15 +18,4 @@
     <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.19.1" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Template\" />
-    <Folder Include="TempDocument\" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="Aspose.Words">
-      <HintPath>C:\Users\chenhaodong\Desktop\dbcode-team-orders-pdf_v2-\pdfv2\bin\Debug\net6.0\Aspose.Words.dll</HintPath>
-    </Reference>
-  </ItemGroup>
-
 </Project>
